@@ -62,7 +62,13 @@ func findProductByID(id int, products []Product) (*Product, error) {
 
 func main() {
 
-	db, err := connectDB()
+	config, err := loadConfig()
+	if err != nil {
+		fmt.Println("Configuration error:", err)
+		return
+	}
+
+	db, err := connectDB(config)
 	if err != nil {
 		fmt.Println("Database error:", err)
 		return
