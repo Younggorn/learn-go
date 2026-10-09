@@ -13,17 +13,25 @@ type Product struct {
 }
 
 func main() {
-	products := []Product{
-		{ID: 1, Name: "Keyboard", Price: 1500, Stock: 10},
-		{ID: 2, Name: "Mouse", Price: 700, Stock: 20},
-		{ID: 3, Name: "Monitor", Price: 5900, Stock: 5},
-	}
+	jsonData := `{
+	"id": 10,
+	"name": "Gaming Mouse",
+	"price": 1290,
+	"stock": 15
+}`
 
-	jsonData, err := json.MarshalIndent(products, "", "  ")
+	var product Product
+	err := json.Unmarshal([]byte(jsonData), &product)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 
-	fmt.Println(string(jsonData))
+	fmt.Printf("ID: %d\n", product.ID)
+	fmt.Printf("Name: %s\n", product.Name)
+	fmt.Printf("Price: %.2f\n", product.Price)
+	fmt.Printf("Stock: %d\n", product.Stock)
+
+
+	
 }
