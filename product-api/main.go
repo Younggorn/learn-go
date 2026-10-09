@@ -5,10 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"context"
 )
 
 type Product struct {
 	ID    int     `json:"id"`
+	Name  string  `json:"name"`
+	Price float64 `json:"price"`
+	Stock int     `json:"stock"`
+}
+
+type UpdateProductRequest struct {
 	Name  string  `json:"name"`
 	Price float64 `json:"price"`
 	Stock int     `json:"stock"`
@@ -27,6 +34,22 @@ func validateProduct(product Product) error {
 	return nil
 }
 
+func validateUpdateProduct(product UpdateProductRequest) error {
+	if product.Name == "" {
+		return fmt.Errorf("product name is required")
+	}
+
+	if product.Price <= 0 {
+		return fmt.Errorf("product price must be greater than zero")
+	}
+
+	if product.Stock < 0 {
+		return fmt.Errorf("product stock cannot be negative")
+	}
+
+	return nil
+}
+
 func findProductByID(id int, products []Product) (*Product, error) {
 	for i := range products {
 		if products[i].ID == id {
@@ -38,6 +61,46 @@ func findProductByID(id int, products []Product) (*Product, error) {
 }
 
 func main() {
+
+	db, err := connectDB()
+	if err != nil {
+		fmt.Println("Database error:", err)
+		return
+	}
+
+	defer db.Close()
+
+	fmt.Println("PostgreSQL connected successfully")
+
+	rows, err := db.Query(
+		context.Background(),
+		"SELECT id, name, price, stock FROM products ORDER BY id",
+	)
+
+	if err != nil {
+		fmt.Println("Query error:", err)
+		return
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var product Product
+
+		err := rows.Scan(
+			&product.ID,
+			&product.Name,
+			&product.Price,
+			&product.Stock,
+		)
+
+		if err != nil {
+			fmt.Println("Scan error:", err)
+			return
+		}
+
+		fmt.Println(product)
+	}
 
 	products := []Product{
 		{ID: 1, Name: "Keyboard", Price: 1500, Stock: 10},
@@ -130,7 +193,7 @@ func main() {
 			return
 		}
 
-		var updatedProduct Product
+		var updatedProduct UpdateProductRequest
 
 		err = json.NewDecoder(r.Body).Decode(&updatedProduct)
 		if err != nil {
@@ -138,7 +201,7 @@ func main() {
 			return
 		}
 
-		if err := validateProduct(updatedProduct); err != nil {
+		if err := validateUpdateProduct(updatedProduct); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -154,10 +217,36 @@ func main() {
 		}
 	})
 
+	http.HandleFunc("DELETE /products/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idString := r.PathValue("id")
+
+		productID, err := strconv.Atoi(idString)
+		if err != nil {
+			http.Error(w, "Invalid product ID", http.StatusBadRequest)
+			return
+		}
+
+		deleted := false
+
+		// Remove the product from the slice
+		for i, p := range products {
+			if p.ID == productID {
+				products = append(products[:i], products[i+1:]...)
+				break
+			}
+		}
+
+		if !deleted {
+			http.Error(w, "Product not found", http.StatusNotFound)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	fmt.Println("Server running on port 3000")
 
-	err := http.ListenAndServe(":3000", nil)
-	if err != nil {
+	if err := http.ListenAndServe("127.0.0.1:3000", nil); err != nil {
 		fmt.Println("Error starting server:", err)
 	}
 }
